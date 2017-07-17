@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+
+"""A tool to find dead youtube links in comments on icheckmovies.com.
+
+Links that don't return 200 HTTP status are also checked
+via YouTube Data API v3 for a more precise unavailability reason.
+
+Requires Python 3.6+ with requests and bs4 libraries and a Google API key."""
+
 import logging
 import operator
 import re
@@ -118,6 +127,7 @@ def top_users(*, from_: int = 1, to: int) -> Generator[str, None, None]:
 
 def write_dead_in_top_users(pages: int = 1):
     """Find all dead youtube links made by ICM users in the first N pages of profile charts
+    and output them to a markdown file. Uses a blacklist file to avoid re-checking users."""
     and output them to a markdown file."""
     with open(PATH_USERS) as f:
         checked_users = [s.strip() for s in f if s.strip()]
@@ -129,7 +139,8 @@ def write_dead_in_top_users(pages: int = 1):
             f.write(user + '\n')
 
 
-def sort_output_file(filename):
+def sort_output_file(filename=PATH_OUT):
+    """Modify the output file so that users are sorted by the number of their dead links descending."""
     with open(filename) as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
     blocks_with_lens = [(b, int(re.search(r' \((\d+)\)\n', b).group(1))) for b in blocks]
@@ -141,6 +152,4 @@ def sort_output_file(filename):
 if __name__ == '__main__':
     write_dead_in_profile(user='bdcortright')
     # write_dead_in_top_users(5)
-    # sort_output_file(PATH_OUT)
     # TODO: console args?
-    # TODO: finish documentation
