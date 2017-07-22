@@ -7,6 +7,7 @@ via YouTube Data API v3 for a more precise unavailability reason.
 
 Requires Python 3.6+ with requests and bs4 libraries and a Google API key."""
 
+import argparse
 import logging
 import operator
 import re
@@ -157,6 +158,21 @@ def sort_output_file(filename=PATH_OUT):
 
 
 if __name__ == '__main__':
-    write_dead_in_profile(user='bdcortright')
-    # write_dead_in_top_users(5)
-    # TODO: console args?
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    group = parser.add_argument_group()
+    group.add_argument('username', help='find all dead youtube links by this user', nargs='?')
+    group.add_argument('-t', '--top', help='check users on the first N pages of profile charts',
+                       metavar='PAGES', type=int)
+    group.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_USERS})",
+                       action='store_true')
+    if len(sys.argv) == 1:  # no arguments given
+        parser.print_help()
+        parser.exit()
+    args = parser.parse_args()
+    if args.top:
+        write_dead_in_top_users(pages=args.top, use_blacklist=not args.ignore_blacklist)
+    elif args.username:
+        write_dead_in_profile(user=args.username)
+    else:
+        print('No username given.')
+        parser.print_usage()
