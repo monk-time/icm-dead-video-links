@@ -125,18 +125,22 @@ def top_users(*, from_: int = 1, to: int) -> Generator[str, None, None]:
             yield t.get_text(strip=True)
 
 
-def write_dead_in_top_users(pages: int = 1):
+def write_dead_in_top_users(*, pages: int = 1, use_blacklist: bool = True):
     """Find all dead youtube links made by ICM users in the first N pages of profile charts
     and output them to a markdown file. Uses a blacklist file to avoid re-checking users."""
-    and output them to a markdown file."""
-    with open(PATH_USERS) as f:
-        checked_users = [s.strip() for s in f if s.strip()]
-    users_to_check = (u for u in top_users(to=pages) if u not in checked_users)
+    users_to_check = list(top_users(to=pages))
+    logging.info(f'Got {len(users_to_check)} unchecked users')
+    if use_blacklist:
+        with open(PATH_USERS) as f:
+            checked_users = [s.strip() for s in f if s.strip()]
+        users_to_check = [u for u in users_to_check if u not in checked_users]
+        logging.info(f'Got {len(users_to_check)} unchecked users after applying blacklist ({PATH_USERS})')
     with open(PATH_USERS, mode='a', buffering=1, encoding='utf-8') as f:
         for user in users_to_check:
             logging.info(f'Checking {user}...')
             write_dead_in_profile(user=user)
-            f.write(user + '\n')
+            if use_blacklist:
+                f.write(user + '\n')
 
 
 def sort_output_file(filename=PATH_OUT):
