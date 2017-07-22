@@ -46,6 +46,9 @@ def number_of_pages(user: str) -> int:
     if r.status_code != requests.codes.ok:
         logging.error(f"Error while fetching the first page of {user}'s comments: HTTP error {r.status_code}")
         return 0
+    if '/login/' in r.url:
+        logging.error(f"User {user} doesn't exist.")
+        return 0
     soup = BeautifulSoup(r.text, 'html.parser')
     paginator = soup.select('.pages li a')
     return int(paginator[-1].get_text()) if paginator else 1
