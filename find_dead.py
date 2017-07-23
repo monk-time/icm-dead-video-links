@@ -162,10 +162,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     group = parser.add_argument_group()
     group.add_argument('username', help='find all dead youtube links by this user', nargs='?')
-    group.add_argument('-t', '--top', help='check users on the first N pages of profile charts',
-                       metavar='PAGES', type=int)
-    group.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_USERS})",
-                       action='store_true')
+    subgroup = parser.add_argument_group('by charts')
+    subgroup.add_argument('-t', '--top', help='check users on the first N pages of profile charts',
+                          metavar='PAGES', type=int)
+    subgroup.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_USERS})",
+                          action='store_true')
     if len(sys.argv) == 1:  # no arguments given
         parser.print_help()
         parser.exit()
