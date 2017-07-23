@@ -171,10 +171,14 @@ if __name__ == '__main__':
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
-    if args.top:
-        write_dead_in_top_users(pages=args.top, use_blacklist=not args.ignore_blacklist)
-    elif args.username:
-        write_dead_in_profile(user=args.username)
-    else:
-        print('No username given.')
-        parser.print_usage()
+    try:
+        if args.username:
+            write_dead_in_profile(user=args.username)
+        elif args.top:
+            write_dead_in_top_users(pages=args.top, use_blacklist=not args.ignore_blacklist)
+        else:
+            print('No username given.')
+            parser.print_usage()
+    except KeyboardInterrupt:
+        logging.info('Execution stopped by the user.')
+        parser.exit()
