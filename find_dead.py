@@ -26,7 +26,8 @@ URL_CHARTS = 'https://www.icheckmovies.com/charts/profiles/'
 
 logging.basicConfig(filename=PATH_LOG, level=logging.DEBUG,
                     format='{asctime} {levelname:8} {message}', style='{')
-logging.getLogger('requests').setLevel(logging.WARNING)
+for lib in ['requests', 'urllib3']:
+    logging.getLogger(lib).setLevel(logging.WARNING)
 
 handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.INFO)
