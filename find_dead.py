@@ -13,6 +13,7 @@ import operator
 import re
 import sys
 import urllib.parse
+from copy import copy
 from typing import Iterable, List, Generator
 
 import requests
@@ -24,15 +25,28 @@ PATH_USERS = 'checked_users.txt'
 URL_USER_COMMENTS = 'https://www.icheckmovies.com/profiles/comments/'
 URL_CHARTS = 'https://www.icheckmovies.com/charts/profiles/'
 
-logging.basicConfig(filename=PATH_LOG, level=logging.DEBUG,
-                    format='{asctime} {levelname:8} {message}', style='{')
+
+# --- logging setup ---
+
+class CustomFormatter(logging.Formatter):
+    def format(self, record):
+        record = copy(record)  # the same LogRecord instance is sent to all handlers
+        record.msg = record.msg.strip()
+        return super().format(record).strip()
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+file_handler = logging.FileHandler(PATH_LOG, encoding='utf-8')
+file_handler.setFormatter(CustomFormatter(fmt='{asctime} {levelname:8} {message}', style='{'))
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 for lib in ['requests', 'urllib3']:
     logging.getLogger(lib).setLevel(logging.WARNING)
 
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-handler.setFormatter(logging.Formatter('{message}', style='{'))
-logging.getLogger().addHandler(handler)
+# --- /logging setup ---
 
 try:
     from youtube_utils import extract_yt_ids, is_valid_yt_video, yt_video_status
@@ -97,6 +111,9 @@ def dead_in_comments(comments: Iterable[Tag]):
             logging.debug(f'{ytid} on {movie}: 200 OK')
         else:
             reason = yt_video_status(ytid)
+            if reason == 'ok':
+                logging.warning(f'{ytid} on {movie}: NOT 200 OK, but video is available')
+                continue
             logging.warning(f'{ytid} on {movie}: {reason}')
             if reason == 'not found':
                 reason = None
@@ -106,6 +123,7 @@ def dead_in_comments(comments: Iterable[Tag]):
 def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     """Find all dead youtube links made by an ICM user and output them to a markdown file.
     Fetches all comment pages unless a subrange (inclusive) is provided."""
+    logging.info(f'\nChecking {user}...')
     to = to or number_of_pages(user)
     logging.info(f'Got {to} pages of comments')
     comments = comments_in_profile(user=user, from_=from_, to=to)
@@ -142,7 +160,6 @@ def write_dead_in_top_users(*, pages: int = 1, use_blacklist: bool = True):
         logging.info(f'Got {len(users_to_check)} unchecked users after applying blacklist ({PATH_USERS})')
     with open(PATH_USERS, mode='a', buffering=1, encoding='utf-8') as f:
         for user in users_to_check:
-            logging.info(f'Checking {user}...')
             write_dead_in_profile(user=user)
             if use_blacklist:
                 f.write(user + '\n')
@@ -179,6 +196,7 @@ if __name__ == '__main__':
         else:
             print('No username given.')
             parser.print_usage()
+
     except KeyboardInterrupt:
         logging.info('Execution stopped by the user.')
         parser.exit()
