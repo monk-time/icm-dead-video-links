@@ -1,9 +1,10 @@
 from collections import Counter
-from pprint import pprint
 from typing import Iterable, List, Tuple
 
 import requests
 from bs4 import BeautifulSoup
+
+from find_dead import write_dead_by_users
 
 
 def number_of_pages(movie: str) -> int:
@@ -37,11 +38,14 @@ def commenters(movie: str) -> Counter:
     return c
 
 
-def top_commenters_on_movies_in_a_list(url: str) -> List[Tuple[str, int]]:
+def top_commenters_on_movies_in_a_list(url: str, min_comments: int = 0) -> List[Tuple[str, int]]:
     summary = sum((commenters(m) for m in all_movies_on_a_list(url)), Counter())
-    return [(el, cnt) for el, cnt in summary.most_common() if cnt > 1]
+    return [(el, cnt) for el, cnt in summary.most_common() if cnt > min_comments]
 
 
 if __name__ == '__main__':
     url_ = 'https://www.icheckmovies.com/lists/all+shorts+on+icm+lists/mjf314/'
-    pprint(top_commenters_on_movies_in_a_list(url_))
+    top_commenters = top_commenters_on_movies_in_a_list(url_)
+    print('Top commenters:\n', top_commenters)
+    users_to_check = list(user for user, cnt in top_commenters)
+    write_dead_by_users(users_to_check)

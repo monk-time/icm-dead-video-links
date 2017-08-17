@@ -206,7 +206,6 @@ if __name__ == '__main__':
         else:
             print('No username given.')
             parser.print_usage()
-
     except KeyboardInterrupt:
         logging.info('Execution stopped by the user.')
         parser.exit()
