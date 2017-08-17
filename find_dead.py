@@ -14,16 +14,17 @@ import re
 import sys
 import urllib.parse
 from copy import copy
-from typing import Iterable, List, Generator
+from typing import Iterable, List, Generator, Sequence
 
 import requests
 from bs4 import BeautifulSoup, Tag
 
 PATH_LOG = 'find_dead.log'
 PATH_OUT = 'result.md'
-PATH_USERS = 'checked_users.txt'
+PATH_CHECKED_USERS = 'checked_users.txt'
 URL_USER_COMMENTS = 'https://www.icheckmovies.com/profiles/comments/'
 URL_CHARTS = 'https://www.icheckmovies.com/charts/profiles/'
+URL_USERS_BY_CHECKS = 'https://www.icheckmovies.com/profiles/?sort=checks'
 
 
 # --- logging setup ---
@@ -138,30 +139,36 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
                     f'[{movie}](https://www.icheckmovies.com{movie}comments/)\n')
 
 
-def top_users(*, from_: int = 1, to: int) -> Generator[str, None, None]:
-    """Get all top ranking users from the first N pages of profile charts."""
+def top_users(*, from_: int = 1, to: int = 1, by_all_checks: bool = False) -> Generator[str, None, None]:
+    """Get all top ranking users from the first N pages of profile charts or charts by all checks."""
     for page in range(from_, to + 1):
-        r = requests.get(URL_CHARTS, {'page': page})
+        url = URL_USERS_BY_CHECKS if by_all_checks else URL_CHARTS
+        r = requests.get(url, {'page': page})
         r.raise_for_status()
         soup = BeautifulSoup(r.text, 'html.parser')
         for t in soup.select('.listItemProfile h2 a'):
             yield t.get_text(strip=True)
 
 
-def write_dead_in_top_users(*, pages: int = 1, use_blacklist: bool = True):
-    """Find all dead youtube links made by ICM users in the first N pages of profile charts
-    and output them to a markdown file. Uses a blacklist file to avoid re-checking users."""
-    users_to_check = list(top_users(to=pages))
-    logging.info(f'Got {len(users_to_check)} unchecked users')
-    if use_blacklist:
-        with open(PATH_USERS) as f:
-            checked_users = [s.strip() for s in f if s.strip()]
-        users_to_check = [u for u in users_to_check if u not in checked_users]
-        logging.info(f'Got {len(users_to_check)} unchecked users after applying blacklist ({PATH_USERS})')
-    with open(PATH_USERS, mode='a', buffering=1, encoding='utf-8') as f:
-        for user in users_to_check:
+def filter_by_blacklist(users: Iterable[str]):
+    """Exclude users listed in a blacklist file."""
+    with open(PATH_CHECKED_USERS, encoding='utf-8') as f:
+        checked_users = [s.strip() for s in f if s.strip()]
+    yield from (u for u in users if u not in checked_users)
+
+
+def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
+    """Find all dead youtube links made by the given ICM users and output them to a markdown file.
+    Can use a blacklist file to avoid re-checking users."""
+    # TODO: change the type hint from Sequence to Collection (PyCharm bug PY-24605)
+    logging.info(f'Got {len(users)} unchecked users')
+    if not ignore_blacklist:
+        users = list(filter_by_blacklist(users))
+        logging.info(f'Got {len(users)} unchecked users after applying blacklist ({PATH_CHECKED_USERS})')
+    with open(PATH_CHECKED_USERS, mode='a', buffering=1, encoding='utf-8') as f:
+        for user in users:
             write_dead_in_profile(user=user)
-            if use_blacklist:
+            if not ignore_blacklist:
                 f.write(user + '\n')
 
 
@@ -182,7 +189,9 @@ if __name__ == '__main__':
     subgroup = parser.add_argument_group('by charts')
     subgroup.add_argument('-t', '--top', help='check users on the first N pages of profile charts',
                           metavar='PAGES', type=int)
-    subgroup.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_USERS})",
+    subgroup.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_CHECKED_USERS})",
+                          action='store_true')
+    subgroup.add_argument('-a', '--allchecks', help='use charts by all checks instead of only official ones',
                           action='store_true')
     if len(sys.argv) == 1:  # no arguments given
         parser.print_help()
@@ -192,7 +201,8 @@ if __name__ == '__main__':
         if args.username:
             write_dead_in_profile(user=args.username)
         elif args.top:
-            write_dead_in_top_users(pages=args.top, use_blacklist=not args.ignore_blacklist)
+            users_ = list(top_users(to=args.top, by_all_checks=args.allchecks))
+            write_dead_by_users(users_, ignore_blacklist=args.ignore_blacklist)
         else:
             print('No username given.')
             parser.print_usage()
