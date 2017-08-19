@@ -74,7 +74,12 @@ def number_of_pages(user: str) -> int:
         return 0
     soup = BeautifulSoup(r.text, 'html.parser')
     paginator = soup.select('.pages li a')
-    return int(paginator[-1].get_text()) if paginator else 1
+    if paginator:
+        return int(paginator[-1].get_text())
+    elif len(soup.select('.comment')) == 0:
+        return 0
+    else:
+        return 1
 
 
 def parse_comment(comment: Tag):
@@ -90,7 +95,7 @@ def parse_comment(comment: Tag):
 def comments_in_profile_page(*, user: str, page: int) -> List[Tag]:
     """Get comments of an ICM user from one page of their profile."""
     r = requests.get(URL_USER_COMMENTS, {'user': user, 'page': page})
-    logging.info(f"Checking {user}'s page #{page} ({r.url})")
+    logging.info(f"Checking {user}'s page #{page}")
     if r.status_code != requests.codes.ok:
         logging.error(f'Page #{page}: HTTP error {r.status_code}')
         return []
@@ -132,7 +137,8 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     Fetches all comment pages unless a subrange (inclusive) is provided."""
     logging.info(f'\nChecking {user}...')
     to = to or number_of_pages(user)
-    logging.info(f'Got {to} pages of comments')
+    if to > 0:
+        logging.info(f'Got {to} pages of comments')
     comments = comments_in_profile(user=user, from_=from_, to=to)
     dead_links = list(dead_in_comments(comments))
     if not dead_links:
