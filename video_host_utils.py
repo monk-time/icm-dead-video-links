@@ -3,11 +3,13 @@ from pathlib import Path
 
 import requests
 
-PATH_KEY = 'youtube_data_api.key'
-if Path(PATH_KEY).exists():
-    YT_API_KEY = Path(PATH_KEY).read_text().strip()
+YT_KEY_FILENAME = 'youtube_data_api.key'
+yt_key_path = Path(__file__).resolve().parent / YT_KEY_FILENAME
+
+if yt_key_path.exists():
+    YT_API_KEY = yt_key_path.read_text().strip()
 else:
-    raise FileNotFoundError(f'Create a file "{PATH_KEY}" in the script directory\n'
+    raise FileNotFoundError(f'Create a file "{YT_KEY_FILENAME}" in the script directory\n'
                             f'and put your Google API key inside.\n'
                             'For more info: https://support.google.com/googleapi/answer/6158862')
 

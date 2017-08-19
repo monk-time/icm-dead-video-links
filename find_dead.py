@@ -14,6 +14,7 @@ import re
 import sys
 import urllib.parse
 from copy import copy
+from pathlib import Path
 from typing import Iterable, List, Generator, Sequence
 
 import requests
@@ -25,6 +26,11 @@ PATH_CHECKED_USERS = 'checked_users.txt'
 URL_USER_COMMENTS = 'https://www.icheckmovies.com/profiles/comments/'
 URL_CHARTS = 'https://www.icheckmovies.com/charts/profiles/'
 URL_USERS_BY_CHECKS = 'https://www.icheckmovies.com/profiles/?sort=checks'
+
+try:
+    script_path = Path(__file__).resolve().parent
+except NameError:
+    script_path = Path('.')
 
 
 # --- logging setup ---
@@ -38,7 +44,7 @@ class CustomFormatter(logging.Formatter):
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler(PATH_LOG, encoding='utf-8')
+file_handler = logging.FileHandler(script_path / PATH_LOG, encoding='utf-8')
 file_handler.setFormatter(CustomFormatter(fmt='{asctime} {levelname:8} {message}', style='{'))
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.INFO)
@@ -131,7 +137,7 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     dead_links = list(dead_in_comments(comments))
     if not dead_links:
         return
-    with open(PATH_OUT, mode='a', encoding='utf-8') as f:
+    with open(script_path / PATH_OUT, mode='a', encoding='utf-8') as f:
         f.write(f'## [{user}]({URL_USER_COMMENTS}?user={urllib.parse.quote_plus(user)}) ({len(dead_links)})\n')
         for movie, ytid, reason in dead_links:
             reason_text = f'**({reason})** ' if reason else ''
@@ -152,7 +158,7 @@ def top_users(*, from_: int = 1, to: int = 1, by_all_checks: bool = False) -> Ge
 
 def filter_by_blacklist(users: Iterable[str]):
     """Exclude users listed in a blacklist file."""
-    with open(PATH_CHECKED_USERS, encoding='utf-8') as f:
+    with open(script_path / PATH_CHECKED_USERS, encoding='utf-8') as f:
         checked_users = [s.strip() for s in f if s.strip()]
     yield from (u for u in users if u not in checked_users)
 
@@ -165,7 +171,7 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
     if not ignore_blacklist:
         users = list(filter_by_blacklist(users))
         logging.info(f'Got {len(users)} unchecked users after applying blacklist ({PATH_CHECKED_USERS})')
-    with open(PATH_CHECKED_USERS, mode='a', buffering=1, encoding='utf-8') as f:
+    with open(script_path / PATH_CHECKED_USERS, mode='a', buffering=1, encoding='utf-8') as f:
         for user in users:
             write_dead_in_profile(user=user)
             if not ignore_blacklist:
@@ -174,11 +180,11 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
 
 def sort_output_file(filename=PATH_OUT):
     """Modify the output file so that users are sorted by the number of their dead links descending."""
-    with open(filename) as f:
+    with open(script_path / filename, encoding='utf-8') as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
     blocks_with_lens = [(b, int(re.search(r' \((\d+)\)\n', b).group(1))) for b in blocks]
     blocks_with_lens.sort(key=operator.itemgetter(1), reverse=True)
-    with open(filename, mode='w', encoding='utf-8') as f:
+    with open(script_path / filename, mode='w', encoding='utf-8') as f:
         f.writelines(b[0] for b in blocks_with_lens)
 
 
