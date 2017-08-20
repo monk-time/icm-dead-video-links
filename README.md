@@ -1,4 +1,4 @@
-# icm-dead-yt-links
+# icm-dead-video-links
 How to run:
 1. Make sure you have Python 3.6+ installed:
 
