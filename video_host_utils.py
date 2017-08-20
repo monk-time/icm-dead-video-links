@@ -1,5 +1,7 @@
 import re
+from functools import partial
 from pathlib import Path
+from typing import Pattern, NamedTuple, Callable, List
 
 import requests
 
@@ -23,20 +25,30 @@ RE_YT_ID = re.compile(r"""
     ([-_a-zA-Z0-9]{11,12})
     """, re.VERBOSE)
 
-
-def extract_yt_ids(s: str):
-    """Find all video ids from somewhat valid YT urls in a text string using regex."""
-    return [m.group(1) for m in RE_YT_ID.finditer(s)]
+RE_VIMEO_ID = re.compile(r'vimeo\.com/(\d+)')
 
 
-def is_valid_yt_video(ytid: str):
-    """Check if a given YT video id is valid by sending a HEAD request."""
-    r = requests.head(f'https://www.youtube.com/watch?v={ytid}', allow_redirects=True)
+def extract_video_ids(regex: Pattern, s: str):
+    """Find all video ids from video urls in a text string using regex."""
+    return [m.group(1) for m in regex.finditer(s)]
+
+
+def is_valid_video(url: str, vid: str):
+    """Check if a given video id is valid by sending a HEAD request."""
+    r = requests.head(url.format(vid), allow_redirects=True)
     return r.status_code == requests.codes.ok
 
 
-def yt_video_status(ytid: str) -> str:
-    """Get a youtube video status via Youtube Data API v3."""
+extract_yt_ids = partial(extract_video_ids, RE_YT_ID)
+extract_vimeo_ids = partial(extract_video_ids, RE_VIMEO_ID)
+yt_url = 'https://www.youtube.com/watch?v={}'
+vimeo_url = 'https://vimeo.com/{}'
+is_valid_yt_video = partial(is_valid_video, yt_url)
+is_valid_vimeo_video = partial(is_valid_video, vimeo_url)
+
+
+def yt_video_reason(ytid: str) -> str:
+    """Get a reson for youtube video unavailability via Youtube Data API v3."""
     r = requests.get(
         'https://www.googleapis.com/youtube/v3/videos',
         {'id': ytid, 'key': YT_API_KEY, 'part': 'status,contentDetails',
@@ -76,3 +88,16 @@ def yt_video_status(ytid: str) -> str:
             return f"blocked in {n_blocked} countries"
 
     raise RuntimeError(f'Unexpected Youtube API response for {ytid}', yt_response)
+
+
+class VideoHostToolset(NamedTuple):
+    url: str
+    extractor: Callable[[str], List[str]]
+    validator: Callable[[str], bool]
+    get_reason: Callable[[str], str] = None
+
+
+VIDEO_HOSTS = {
+    'youtube': VideoHostToolset(yt_url, extract_yt_ids, is_valid_yt_video, yt_video_reason),
+    'vimeo': VideoHostToolset(vimeo_url, extract_vimeo_ids, is_valid_vimeo_video)
+}
