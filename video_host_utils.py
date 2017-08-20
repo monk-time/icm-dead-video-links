@@ -1,12 +1,12 @@
 import re
 from functools import partial
 from pathlib import Path
-from typing import Pattern, NamedTuple, Callable, List
+from typing import Pattern, Callable, List
 
 import requests
 
 YT_KEY_FILENAME = 'youtube_data_api.key'
-yt_key_path = Path(__file__).resolve().parent / YT_KEY_FILENAME
+yt_key_path: Path = Path(__file__).resolve().parent / YT_KEY_FILENAME
 
 if yt_key_path.exists():
     YT_API_KEY = yt_key_path.read_text().strip()
@@ -15,36 +15,16 @@ else:
                             f'and put your Google API key inside.\n'
                             'For more info: https://support.google.com/googleapi/answer/6158862')
 
-RE_YT_ID = re.compile(r"""
-    (?:youtu\.be/|
-       youtube\.com/
-       (?:(?:vi?|(?:user/)?\w+\#p/(?:\w+/)?\w+/\d+|
-             e|embed)/|
-          (?:[\w?=]+)?[?&]vi?=)
-    )
-    ([-_a-zA-Z0-9]{11,12})
-    """, re.VERBOSE)
-
-RE_VIMEO_ID = re.compile(r'vimeo\.com/(\d+)')
-
 
 def extract_video_ids(regex: Pattern, s: str):
     """Find all video ids from video urls in a text string using regex."""
     return [m.group(1) for m in regex.finditer(s)]
 
 
-def is_valid_video(url: str, vid: str):
-    """Check if a given video id is valid by sending a HEAD request."""
+def is_alive_video(url: str, vid: str):
+    """Check if a given video id is available by sending a HEAD request."""
     r = requests.head(url.format(vid), allow_redirects=True)
     return r.status_code == requests.codes.ok
-
-
-extract_yt_ids = partial(extract_video_ids, RE_YT_ID)
-extract_vimeo_ids = partial(extract_video_ids, RE_VIMEO_ID)
-yt_url = 'https://www.youtube.com/watch?v={}'
-vimeo_url = 'https://vimeo.com/{}'
-is_valid_yt_video = partial(is_valid_video, yt_url)
-is_valid_vimeo_video = partial(is_valid_video, vimeo_url)
 
 
 def yt_video_reason(ytid: str) -> str:
@@ -90,14 +70,40 @@ def yt_video_reason(ytid: str) -> str:
     raise RuntimeError(f'Unexpected Youtube API response for {ytid}', yt_response)
 
 
-class VideoHostToolset(NamedTuple):
-    url: str
-    extractor: Callable[[str], List[str]]
-    validator: Callable[[str], bool]
-    get_reason: Callable[[str], str] = None
+class VideoHostToolset:
+    def __init__(self, regex: Pattern, url: str,
+                 api_url: str = None, get_reason: Callable[[str], str] = None):
+        self.url = url
+        self.extractor: Callable[[str], List[str]] = partial(extract_video_ids, regex)
+        self.validator: Callable[[str], bool] = partial(is_alive_video, api_url or url)
+        self.get_reason = get_reason
 
 
+RE_YT_ID = re.compile(r"""
+    (?:youtu\.be/|
+       youtube\.com/
+       (?:(?:vi?|(?:user/)?\w+\#p/(?:\w+/)?\w+/\d+|
+             e|embed)/|
+          (?:[\w?=]+)?[?&]vi?=)
+    )
+    ([-_a-zA-Z0-9]{11,12})
+    """, re.VERBOSE)
+
+RE_VIMEO_ID = re.compile(r'vimeo\.com/(\d+)')
+RE_DM_ID = re.compile(r'dailymotion\.com/video/([a-zA-Z0-9]+)')
+RE_GV_ID = re.compile(r'video\.google\.com/videoplay\?.*?docid=([-0-9]+)')
+
+URL_YT = 'https://www.youtube.com/watch?v={}'
+URL_VIMEO = 'https://vimeo.com/{}'
+URL_DM = 'https://www.dailymotion.com/video/{}'
+URL_DM_API = 'https://api.dailymotion.com/video/{}'
+URL_GV = 'http://video.google.com/videoplay?docid={}'
+
+# noinspection PyTypeChecker
+# TODO: ^ remove after PY-24440 gets fixed
 VIDEO_HOSTS = {
-    'youtube': VideoHostToolset(yt_url, extract_yt_ids, is_valid_yt_video, yt_video_reason),
-    'vimeo': VideoHostToolset(vimeo_url, extract_vimeo_ids, is_valid_vimeo_video)
+    'youtube': VideoHostToolset(RE_YT_ID, URL_YT, get_reason=yt_video_reason),
+    'vimeo': VideoHostToolset(RE_VIMEO_ID, URL_VIMEO),
+    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM, api_url=URL_DM_API),
+    'googlevideo': VideoHostToolset(RE_GV_ID, URL_GV)
 }
