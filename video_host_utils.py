@@ -21,9 +21,13 @@ def extract_video_ids(regex: Pattern, s: str):
     return [m.group(1) for m in regex.finditer(s)]
 
 
-def is_alive_video(url: str, vid: str):
+PROXIES = {'http': 'http://proxy.antizapret.prostovpn.org:3128',
+           'https': 'https://proxy.antizapret.prostovpn.org:3128'}
+
+
+def is_alive_video(url: str, vid: str, use_proxy: bool = False):
     """Check if a given video id is available by sending a HEAD request."""
-    r = requests.head(url.format(vid), allow_redirects=True)
+    r = requests.head(url.format(vid), allow_redirects=True, proxies=PROXIES if use_proxy else None)
     return r.status_code == requests.codes.ok
 
 
@@ -72,10 +76,11 @@ def yt_video_reason(ytid: str) -> str:
 
 class VideoHostToolset:
     def __init__(self, regex: Pattern, url: str,
-                 api_url: str = None, get_reason: Callable[[str], str] = None):
+                 api_url: str = None, use_proxy: bool = False,
+                 get_reason: Callable[[str], str] = None):
         self.url = url
         self.extractor: Callable[[str], List[str]] = partial(extract_video_ids, regex)
-        self.validator: Callable[[str], bool] = partial(is_alive_video, api_url or url)
+        self.validator: Callable[[str], bool] = partial(is_alive_video, api_url or url, use_proxy=use_proxy)
         self.get_reason = get_reason
 
 
@@ -90,13 +95,12 @@ RE_YT_ID = re.compile(r"""
     """, re.VERBOSE)
 
 RE_VIMEO_ID = re.compile(r'vimeo\.com/(\d+)')
-RE_DM_ID = re.compile(r'dailymotion\.com/video/([a-zA-Z0-9]+)')
+RE_DM_ID = re.compile(r'dailymotion\.com/video/([^"\s]+)')
 RE_GV_ID = re.compile(r'video\.google\.com/videoplay\?.*?docid=([-0-9]+)')
 
 URL_YT = 'https://www.youtube.com/watch?v={}'
 URL_VIMEO = 'https://vimeo.com/{}'
 URL_DM = 'https://www.dailymotion.com/video/{}'
-URL_DM_API = 'https://api.dailymotion.com/video/{}'
 URL_GV = 'http://video.google.com/videoplay?docid={}'
 
 # noinspection PyTypeChecker
@@ -104,6 +108,6 @@ URL_GV = 'http://video.google.com/videoplay?docid={}'
 VIDEO_HOSTS = {
     'youtube': VideoHostToolset(RE_YT_ID, URL_YT, get_reason=yt_video_reason),
     'vimeo': VideoHostToolset(RE_VIMEO_ID, URL_VIMEO),
-    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM, api_url=URL_DM_API),
+    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM),
     'googlevideo': VideoHostToolset(RE_GV_ID, URL_GV)
 }
