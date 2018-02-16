@@ -16,7 +16,7 @@ import sys
 import urllib.parse
 from copy import copy
 from pathlib import Path
-from typing import Iterable, List, Generator, Sequence
+from typing import Generator, Iterable, List, Sequence
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -68,7 +68,8 @@ def number_of_pages(user: str) -> int:
     """Get the total number of comment pages of an ICM user."""
     r = requests.get(URL_USER_COMMENTS, {'user': user})
     if r.status_code != requests.codes.ok:
-        logging.error(f"Error while fetching the first page of {user}'s comments: HTTP error {r.status_code}")
+        logging.error(f"Error while fetching the first page of {user}'s comments: "
+                      f"HTTP error {r.status_code}")
         return 0
     if '/login/' in r.url:
         logging.error(f"User {user} doesn't exist.")
@@ -113,13 +114,15 @@ def comments_in_profile_page(*, user: str, page: int) -> List[Tag]:
 
 
 def comments_in_profile(*, user: str, from_: int = 1, to: int):
-    """Get all comments of an ICM user, optionally limited to a subrange (inclusive) of their pages."""
+    """Get all comments of an ICM user,
+    optionally limited to a subrange (inclusive) of their pages."""
     for page in range(from_, to + 1):
         yield from comments_in_profile_page(user=user, page=page)
 
 
 def dead_in_comments(comments: Iterable[Tag]):
-    """Find all dead video links in the given comment elements. Supports comments that have several links."""
+    """Find all dead video links in the given comment elements.
+    Supports comments that have several links."""
     comments_with_video = itertools.chain.from_iterable(map(parse_comment, comments))
     for movie, host, vid in comments_with_video:
         if VIDEO_HOSTS[host].validator(vid):
@@ -150,15 +153,18 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     if not dead_links:
         return
     with open(script_path / PATH_OUT, mode='a', encoding='utf-8') as f:
-        f.write(f'## [{user}]({URL_USER_COMMENTS}?user={urllib.parse.quote_plus(user)}) ({len(dead_links)})\n')
+        f.write(f'## [{user}]({URL_USER_COMMENTS}?user={urllib.parse.quote_plus(user)}) '
+                f'({len(dead_links)})\n')
         for movie, host, vid, reason in dead_links:
             reason_text = f'**({reason})** ' if reason else ''
             f.write(f'- [{host}:{vid}]({VIDEO_HOSTS[host].url.format(vid)}) {reason_text}on '
                     f'[{movie}](https://www.icheckmovies.com{movie}comments/)\n')
 
 
-def top_users(*, from_: int = 1, to: int = 1, by_all_checks: bool = False) -> Generator[str, None, None]:
-    """Get all top ranking users from the first N pages of profile charts or charts by all checks."""
+def top_users(*, from_: int = 1, to: int = 1, by_all_checks: bool = False) \
+        -> Generator[str, None, None]:
+    """Get all top-ranking users from the first N pages of profile charts
+    or charts by all checks."""
     for page in range(from_, to + 1):
         url = URL_USERS_BY_CHECKS if by_all_checks else URL_CHARTS
         r = requests.get(url, {'page': page})
@@ -182,7 +188,8 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
     logging.info(f'Got {len(users)} unchecked users')
     if not ignore_blacklist:
         users = list(filter_by_blacklist(users))
-        logging.info(f'Got {len(users)} unchecked users after applying blacklist ({PATH_CHECKED_USERS})')
+        logging.info(f'Got {len(users)} unchecked users after applying blacklist '
+                     f'({PATH_CHECKED_USERS})')
     with open(script_path / PATH_CHECKED_USERS, mode='a', buffering=1, encoding='utf-8') as f:
         for user in users:
             write_dead_in_profile(user=user)
@@ -191,7 +198,8 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
 
 
 def sort_output_file(filename=PATH_OUT):
-    """Modify the output file so that users are sorted by the number of their dead links descending."""
+    """Modify the output file so that users are sorted
+    by the number of their dead links descending."""
     with open(script_path / filename, encoding='utf-8') as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
     blocks_with_lens = [(b, int(re.search(r' \((\d+)\)\n', b).group(1))) for b in blocks]
@@ -201,15 +209,20 @@ def sort_output_file(filename=PATH_OUT):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     group = parser.add_argument_group()
     group.add_argument('username', help='find all dead video links by this user', nargs='?')
     subgroup = parser.add_argument_group('by charts')
-    subgroup.add_argument('-t', '--top', help='check users on the first N pages of profile charts',
-                          metavar='PAGES', type=int)
-    subgroup.add_argument('-i', '--ignore-blacklist', help=f"don't skip checked users (see {PATH_CHECKED_USERS})",
+    subgroup.add_argument('-t', '--top',
+                          help='check users on the first N pages of profile charts',
+                          metavar='PAGES',
+                          type=int)
+    subgroup.add_argument('-i', '--ignore-blacklist',
+                          help=f"don't skip checked users (see {PATH_CHECKED_USERS})",
                           action='store_true')
-    subgroup.add_argument('-a', '--allchecks', help='use charts by all checks instead of only official ones',
+    subgroup.add_argument('-a', '--allchecks',
+                          help='use charts by all checks instead of only official ones',
                           action='store_true')
     if len(sys.argv) == 1:  # no arguments given
         parser.print_help()
