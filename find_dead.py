@@ -165,6 +165,7 @@ def top_users(*, from_: int = 1, to: int = 1, by_all_checks: bool = False) \
         -> Generator[str, None, None]:
     """Get all top-ranking users from the first N pages of profile charts
     or charts by all checks."""
+    logging.info(f'Fetching {to - from_ + 1} pages of users from ICM (starting from #{from_})...')
     for page in range(from_, to + 1):
         url = URL_USERS_BY_CHECKS if by_all_checks else URL_CHARTS
         r = requests.get(url, {'page': page})
@@ -207,13 +208,19 @@ def sort_output_file(filename=PATH_OUT):
     with open(script_path / filename, mode='w', encoding='utf-8') as f:
         f.writelines(b[0] for b in blocks_with_lens)
 
+    num_dead = sum(n for _, n in blocks_with_lens)
+    logging.info(f'{num_dead} dead links in {PATH_OUT}')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     group = parser.add_argument_group()
     group.add_argument('username', help='find all dead video links by this user', nargs='?')
-    subgroup = parser.add_argument_group('by charts')
+    group.add_argument('-s', '--sort',
+                       help=f'sort users in {PATH_OUT} by dead links count',
+                       action='store_true')
+    subgroup = parser.add_argument_group('search users by charts')
     subgroup.add_argument('-t', '--top',
                           help='check users on the first N pages of profile charts',
                           metavar='PAGES',
@@ -231,6 +238,8 @@ if __name__ == '__main__':
     try:
         if args.username:
             write_dead_in_profile(user=args.username)
+        elif args.sort:
+            sort_output_file()
         elif args.top:
             users_ = list(top_users(to=args.top, by_all_checks=args.allchecks))
             write_dead_by_users(users_, ignore_blacklist=args.ignore_blacklist)
