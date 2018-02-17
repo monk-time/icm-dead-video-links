@@ -225,6 +225,11 @@ if __name__ == '__main__':
                           help='check users on the first N pages of profile charts',
                           metavar='PAGES',
                           type=int)
+    subgroup.add_argument('-f', '--from',
+                          dest='minpage',
+                          help='start from the page #NUM of profile charts',
+                          metavar='NUM',
+                          type=int)
     subgroup.add_argument('-i', '--ignore-blacklist',
                           help=f"don't skip checked users (see {PATH_CHECKED_USERS})",
                           action='store_true')
@@ -241,7 +246,8 @@ if __name__ == '__main__':
         elif args.sort:
             sort_output_file()
         elif args.top:
-            users_ = list(top_users(to=args.top, by_all_checks=args.allchecks))
+            minpage = args.minpage or 1
+            users_ = list(top_users(from_=minpage, to=args.top, by_all_checks=args.allchecks))
             write_dead_by_users(users_, ignore_blacklist=args.ignore_blacklist)
         else:
             print('No username given.')
