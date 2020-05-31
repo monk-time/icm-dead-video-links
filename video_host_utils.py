@@ -1,7 +1,7 @@
 import re
 from functools import partial
 from pathlib import Path
-from typing import Pattern, Callable, List
+from typing import Callable, Pattern
 
 import requests
 
@@ -79,15 +79,15 @@ class VideoHostToolset:
                  api_url: str = None, use_proxy: bool = False,
                  get_reason: Callable[[str], str] = None):
         self.url = url
-        self.extractor: Callable[[str], List[str]] = partial(extract_video_ids, regex)
-        self.validator: Callable[[str], bool] = partial(is_alive_video, api_url or url, use_proxy=use_proxy)
+        self.extractor = partial(extract_video_ids, regex)
+        self.validator = partial(is_alive_video, api_url or url, use_proxy=use_proxy)
         self.get_reason = get_reason
 
 
 RE_YT_ID = re.compile(r"""
     (?:youtu\.be/|
        youtube\.com/
-       (?:(?:vi?|(?:user/)?\w+\#p/(?:\w+/)?\w+/\d+|
+       (?:(?:vi?|(?:user/)?\w+#p/(?:\w+/)?\w+/\d+|
              e|embed)/|
           (?:[\w?=]+)?[?&]vi?=)
     )
@@ -103,8 +103,6 @@ URL_VIMEO = 'https://vimeo.com/{}'
 URL_DM = 'https://www.dailymotion.com/video/{}'
 URL_GV = 'http://video.google.com/videoplay?docid={}'
 
-# noinspection PyTypeChecker
-# TODO: ^ remove after PY-24440 gets fixed
 VIDEO_HOSTS = {
     'youtube': VideoHostToolset(RE_YT_ID, URL_YT, get_reason=yt_video_reason),
     'vimeo': VideoHostToolset(RE_VIMEO_ID, URL_VIMEO),

@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Generator, Iterable, List, Sequence
 
 import requests
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 PATH_LOG = 'find_dead.log'
 PATH_OUT = 'result.md'
@@ -91,6 +92,10 @@ def parse_comment(comment: Tag):
         movie = movie['href']
     text = comment.select_one('.span-18 > span')
     text = text.get_text() if text else ''
+    # TODO: fix the line above for comments with no text, e.g.:
+    # "<span><iframe allowfullscreen="" frameborder="0" height="310"
+    # src="http://www.youtube.com/embed/0qFS5IEctis?wmode=opaque"
+    # title="YouTube video player" width="508"></iframe></span>"
     for host in VIDEO_HOSTS:
         ids = VIDEO_HOSTS[host].extractor(text)
         if ids:
@@ -213,6 +218,7 @@ def sort_output_file(filename=PATH_OUT):
 
 
 if __name__ == '__main__':
+    # noinspection PyTypeChecker
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     group = parser.add_argument_group()

@@ -11,7 +11,8 @@ def number_of_pages(movie: str) -> int:
     """Get the total number of comment pages on a movie page."""
     r = requests.get(f'https://www.icheckmovies.com/movies/{movie}/comments/')
     if r.status_code != requests.codes.ok:
-        print(f"Error while fetching the first page of comments on {movie}: HTTP error {r.status_code}")
+        print(f"Error while fetching the first page of comments on {movie}: "
+              f"HTTP error {r.status_code}")
         return 0
     soup = BeautifulSoup(r.text, 'html.parser')
     paginator = soup.select('.pages li a')
