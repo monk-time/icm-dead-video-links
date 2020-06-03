@@ -10,7 +10,6 @@ Requires Python 3.6+ with requests and bs4 libraries and a Google API key."""
 import argparse
 import itertools
 import logging
-import operator
 import re
 import sys
 import urllib.parse
@@ -209,7 +208,7 @@ def sort_output_file(filename=PATH_OUT):
     with open(script_path / filename, encoding='utf-8') as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
     blocks_with_lens = [(b, int(re.search(r' \((\d+)\)\n', b).group(1))) for b in blocks]
-    blocks_with_lens.sort(key=operator.itemgetter(1), reverse=True)
+    blocks_with_lens.sort(key=lambda t: (-t[1], t[0]))
     with open(script_path / filename, mode='w', encoding='utf-8') as f:
         f.writelines(b[0] for b in blocks_with_lens)
 
