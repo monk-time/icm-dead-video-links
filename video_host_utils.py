@@ -21,8 +21,8 @@ def extract_video_ids(regex: Pattern, s: str):
     return [m.group(1) for m in regex.finditer(s)]
 
 
-PROXIES = {'http': 'http://proxy.antizapret.prostovpn.org:3128',
-           'https': 'https://proxy.antizapret.prostovpn.org:3128'}
+PROXIES = {'http': 'proxy-nossl.antizapret.prostovpn.org:29976',
+           'https': 'proxy-nossl.antizapret.prostovpn.org:29976'}
 
 
 def is_alive_video(url: str, vid: str, use_proxy: bool = False):
@@ -51,6 +51,11 @@ def yt_video_reason(ytid: str) -> str:
 
     if 'contentDetails' not in video_info:
         return 'ok'
+    # The video is available but shows a warning about inappropriate content.
+    # Example: https://www.youtube.com/watch?v=sVm7Cqm9Z5c
+    if 'regionRestriction' not in video_info['contentDetails']:
+        return 'ok'
+
     region = video_info['contentDetails']['regionRestriction']
 
     if 'allowed' in region:
@@ -106,6 +111,15 @@ URL_GV = 'http://video.google.com/videoplay?docid={}'
 VIDEO_HOSTS = {
     'youtube': VideoHostToolset(RE_YT_ID, URL_YT, get_reason=yt_video_reason),
     'vimeo': VideoHostToolset(RE_VIMEO_ID, URL_VIMEO),
-    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM),
+    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM, use_proxy=True),
     'googlevideo': VideoHostToolset(RE_GV_ID, URL_GV)
 }
+
+if __name__ == '__main__':
+    # TODO: fix youtube (now it returns 200 for dead links)
+    print(VIDEO_HOSTS['youtube'].validator('N9lpD_lWIUo'))  # Video unavailable (account deleted)
+    print(VIDEO_HOSTS['youtube'].validator('sVm7Cqm9Z5c'))  # Video unavailable
+    print(VIDEO_HOSTS['youtube'].get_reason('sVm7Cqm9Z5c'))  # Video unavailable
+    # print(VIDEO_HOSTS['youtube'].validator('SVEfr7Tfm-g'))
+    # print(VIDEO_HOSTS['youtube'].validator('OkuxYgBNv9c'))
+    # print(VIDEO_HOSTS['dailymotion'].validator('x2bm1t9'))

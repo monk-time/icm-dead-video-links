@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """A tool to find dead video links in comments on icheckmovies.com.
 
