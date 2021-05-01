@@ -25,14 +25,14 @@ PROXIES = {'http': 'proxy-nossl.antizapret.prostovpn.org:29976',
            'https': 'proxy-nossl.antizapret.prostovpn.org:29976'}
 
 
-def is_alive_video(url: str, vid: str, use_proxy: bool = False):
+def get_video_status(url: str, vid: str, use_proxy: bool = False) -> str:
     """Check if a given video id is available by sending a HEAD request."""
     r = requests.head(url.format(vid), allow_redirects=True, proxies=PROXIES if use_proxy else None)
-    return r.status_code == requests.codes.ok
+    return 'ok' if r.status_code == requests.codes.ok else 'not found'
 
 
-def yt_video_reason(ytid: str) -> str:
-    """Get a reson for youtube video unavailability via Youtube Data API v3."""
+def get_yt_video_status(ytid: str) -> str:
+    """Check if a youtube video is available via Youtube Data API v3."""
     r = requests.get(
         'https://www.googleapis.com/youtube/v3/videos',
         {'id': ytid, 'key': YT_API_KEY, 'part': 'status,contentDetails',
@@ -64,29 +64,30 @@ def yt_video_reason(ytid: str) -> str:
             return 'blocked everywhere'
         elif n_allowed <= 5:
             return f"allowed only in {','.join(sorted(region['allowed']))}"
-        else:
+        elif n_allowed <= 10:
             return f"allowed only in {n_allowed} countries"
+        else:
+            return 'ok'
 
     if 'blocked' in region:
         n_blocked = len(region['blocked'])
         if n_blocked == 249:  # all officially assigned ISO 3166-1 alpha-2 codes
             return 'blocked everywhere'
-        elif n_blocked <= 5:
-            return f"blocked in {','.join(region['blocked'])}"
-        else:
+        elif n_blocked >= 50:  # an atritrary cutoff for links that should be deleted
             return f"blocked in {n_blocked} countries"
+        else:
+            return 'ok'
 
     raise RuntimeError(f'Unexpected Youtube API response for {ytid}', yt_response)
 
 
 class VideoHostToolset:
-    def __init__(self, regex: Pattern, url: str,
-                 api_url: str = None, use_proxy: bool = False,
-                 get_reason: Callable[[str], str] = None):
+    def __init__(self, regex: Pattern, url: str, use_proxy: bool = False,
+                 get_status: Callable[[str], str] = None):
         self.url = url
-        self.extractor = partial(extract_video_ids, regex)
-        self.validator = partial(is_alive_video, api_url or url, use_proxy=use_proxy)
-        self.get_reason = get_reason
+        self.extract = partial(extract_video_ids, regex)
+        self.get_status = partial(get_video_status, url, use_proxy=use_proxy) \
+            if get_status is None else get_status
 
 
 RE_YT_ID = re.compile(r"""
@@ -99,27 +100,28 @@ RE_YT_ID = re.compile(r"""
     ([-_a-zA-Z0-9]{11,12})
     """, re.VERBOSE)
 
-RE_VIMEO_ID = re.compile(r'vimeo\.com/(\d+)')
-RE_DM_ID = re.compile(r'dailymotion\.com/video/([^"\s]+)')
-RE_GV_ID = re.compile(r'video\.google\.com/videoplay\?.*?docid=([-0-9]+)')
-
-URL_YT = 'https://www.youtube.com/watch?v={}'
-URL_VIMEO = 'https://vimeo.com/{}'
-URL_DM = 'https://www.dailymotion.com/video/{}'
-URL_GV = 'http://video.google.com/videoplay?docid={}'
-
 VIDEO_HOSTS = {
-    'youtube': VideoHostToolset(RE_YT_ID, URL_YT, get_reason=yt_video_reason),
-    'vimeo': VideoHostToolset(RE_VIMEO_ID, URL_VIMEO),
-    'dailymotion': VideoHostToolset(RE_DM_ID, URL_DM, use_proxy=True),
-    'googlevideo': VideoHostToolset(RE_GV_ID, URL_GV)
+    'youtube': VideoHostToolset(
+        regex=RE_YT_ID,
+        url='https://www.youtube.com/watch?v={}',
+        get_status=get_yt_video_status),
+    'vimeo': VideoHostToolset(
+        regex=re.compile(r'vimeo\.com/(\d+)'),
+        url='https://vimeo.com/{}'),
+    'dailymotion': VideoHostToolset(
+        regex=(re.compile(r'dailymotion\.com/video/([^"\s]+)')),
+        url='https://www.dailymotion.com/video/{}',
+        use_proxy=True),
+    'googlevideo': VideoHostToolset(
+        regex=re.compile(r'video\.google\.com/videoplay\?.*?docid=([-0-9]+)'),
+        url='http://video.google.com/videoplay?docid={}')
 }
 
 if __name__ == '__main__':
-    # TODO: fix youtube (now it returns 200 for dead links)
-    print(VIDEO_HOSTS['youtube'].validator('N9lpD_lWIUo'))  # Video unavailable (account deleted)
-    print(VIDEO_HOSTS['youtube'].validator('sVm7Cqm9Z5c'))  # Video unavailable
-    print(VIDEO_HOSTS['youtube'].get_reason('sVm7Cqm9Z5c'))  # Video unavailable
-    # print(VIDEO_HOSTS['youtube'].validator('SVEfr7Tfm-g'))
-    # print(VIDEO_HOSTS['youtube'].validator('OkuxYgBNv9c'))
-    # print(VIDEO_HOSTS['dailymotion'].validator('x2bm1t9'))
+    print(VIDEO_HOSTS['youtube'].get_status('dQw4w9WgXcQ'))  # ok
+    print(VIDEO_HOSTS['youtube'].get_status('N9lpD_lWIUo'))  # unavailable (account deleted)
+    print(VIDEO_HOSTS['youtube'].get_status('OkuxYgBNv9c'))  # unavailable (copyright claim)
+    print(VIDEO_HOSTS['youtube'].get_status('PZMywkeqpx4'))  # unavailable (private)
+    print(VIDEO_HOSTS['youtube'].get_status('sVm7Cqm9Z5c'))  # unavailable
+    print(VIDEO_HOSTS['youtube'].get_status('SVEfr7Tfm-g'))  # unavailable
+    print(VIDEO_HOSTS['dailymotion'].get_status('x2bm1t9'))  # ok

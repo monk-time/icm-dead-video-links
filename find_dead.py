@@ -34,7 +34,7 @@ except NameError:
     script_path = Path('.')
 
 
-# --- logging setup ---
+# ----- Logging setup -----
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
@@ -54,7 +54,7 @@ logger.addHandler(console_handler)
 for lib in ['requests', 'urllib3']:
     logging.getLogger(lib).setLevel(logging.WARNING)
 
-# --- /logging setup ---
+# ----- Main -----
 
 try:
     from video_host_utils import VIDEO_HOSTS
@@ -96,7 +96,7 @@ def parse_comment(comment: Tag):
     # src="http://www.youtube.com/embed/0qFS5IEctis?wmode=opaque"
     # title="YouTube video player" width="508"></iframe></span>"
     for host in VIDEO_HOSTS:
-        ids = VIDEO_HOSTS[host].extractor(text)
+        ids = VIDEO_HOSTS[host].extract(text)
         if ids:
             for vid in ids:
                 yield movie, host, vid
@@ -117,7 +117,7 @@ def comments_in_profile_page(*, user: str, page: int) -> List[Tag]:
     return soup.find_all(exclude_login_warning, class_='comment')
 
 
-def comments_in_profile(*, user: str, from_: int = 1, to: int):
+def comments_in_profile(*, user: str, from_: int = 1, to: int) -> Generator[Tag, None, None]:
     """Get all comments of an ICM user,
     optionally limited to a subrange (inclusive) of their pages."""
     for page in range(from_, to + 1):
@@ -129,20 +129,14 @@ def dead_in_comments(comments: Iterable[Tag]):
     Supports comments that have several links."""
     comments_with_video = itertools.chain.from_iterable(map(parse_comment, comments))
     for movie, host, vid in comments_with_video:
-        if VIDEO_HOSTS[host].validator(vid):
-            logging.debug(f'[{host}] {vid} on {movie}: 200 OK')
-        else:
-            if VIDEO_HOSTS[host].get_reason:
-                reason = VIDEO_HOSTS[host].get_reason(vid)
-            else:
-                reason = 'not found'
-            if reason == 'ok':
-                logging.warning(f'[{host}] {vid} on {movie}: NOT 200 OK, but video is available')
-                continue
-            logging.warning(f'[{host}] {vid} on {movie}: {reason}')
-            if reason == 'not found':
-                reason = None
-            yield movie, host, vid, reason
+        status = VIDEO_HOSTS[host].get_status(vid)
+        if status == 'ok':
+            logging.debug(f'[{host}] {vid} on {movie}: OK')
+            continue
+        logging.warning(f'[{host}] {vid} on {movie}: {status}')
+        if status == 'not found':
+            status = None
+        yield movie, host, vid, status
 
 
 def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
@@ -159,9 +153,9 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     with open(script_path / PATH_OUT, mode='a', encoding='utf-8') as f:
         f.write(f'## [{user}]({URL_USER_COMMENTS}?user={urllib.parse.quote_plus(user)}) '
                 f'({len(dead_links)})\n')
-        for movie, host, vid, reason in dead_links:
-            reason_text = f'**({reason})** ' if reason else ''
-            f.write(f'- [{host}:{vid}]({VIDEO_HOSTS[host].url.format(vid)}) {reason_text}on '
+        for movie, host, vid, status in dead_links:
+            status_text = f'**({status})** ' if status else ''
+            f.write(f'- [{host}:{vid}]({VIDEO_HOSTS[host].url.format(vid)}) {status_text}on '
                     f'[{movie}](https://www.icheckmovies.com{movie}comments/)\n')
 
 
