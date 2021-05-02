@@ -62,10 +62,6 @@ def get_yt_video_status(ytid: str) -> str:
         n_allowed = len(region['allowed'])
         if n_allowed == 0:
             return 'blocked everywhere'
-        elif n_allowed <= 5:
-            return f"allowed only in {','.join(sorted(region['allowed']))}"
-        elif n_allowed <= 10:
-            return f"allowed only in {n_allowed} countries"
         else:
             return 'ok'
 
@@ -73,8 +69,6 @@ def get_yt_video_status(ytid: str) -> str:
         n_blocked = len(region['blocked'])
         if n_blocked == 249:  # all officially assigned ISO 3166-1 alpha-2 codes
             return 'blocked everywhere'
-        elif n_blocked >= 50:  # an atritrary cutoff for links that should be deleted
-            return f"blocked in {n_blocked} countries"
         else:
             return 'ok'
 
