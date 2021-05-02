@@ -8,6 +8,7 @@ via a video host API (e.g. YouTube Data API v3) for a more precise unavailabilit
 Requires Python 3.6+ with requests and bs4 libraries and a Google API key."""
 
 import argparse
+import csv
 import itertools
 import logging
 import re
@@ -210,6 +211,40 @@ def sort_output_file(filename=PATH_OUT):
     logging.info(f'{num_dead} dead links in {PATH_OUT}')
 
 
+def convert_output_file_to_csv(filename=PATH_OUT):
+    """Convert the output file to a .CSV format."""
+    with open(script_path / filename, encoding='utf-8') as f:
+        blocks = ['##' + s for s in f.read().split('##') if s]
+
+    re_header = re.compile(r'^## \[(?P<author>.+?)]\((?P<author_url>.+?)\) \((?P<count>\d+)\)')
+    re_row = re.compile(r"""
+        ^-\s\[(?P<host>\w+):.+?]
+        \((?P<video_url>.+?)\)
+        (?:\s\*\*\((?P<blocked>blocked\severywhere)\)\*\*)?\s
+        on.+\((?P<comment_url>.+)\)$
+    """, re.VERBOSE)
+
+    full_rows = []
+    for block in blocks:
+        [first_line, *lines] = block.strip().split('\n')
+        author = re_header.match(first_line).groupdict()
+        rows = [re_row.match(line).groupdict() for line in lines]
+
+        assert len(rows) == int(author['count'])
+        del author['count']
+        full_rows.extend({**author, **row} for row in rows)
+
+    csv_path = script_path / Path(filename).with_suffix('.csv')
+    with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+        fieldnames = ['author', 'comment_url', 'host', 'video_url', 'blocked']
+        writer = csv.DictWriter(f, fieldnames, extrasaction='ignore')
+        writer.writeheader()
+        for row in full_rows:
+            writer.writerow(row)
+
+    logging.info(f'Exported {len(full_rows)} dead links from {PATH_OUT} as .CSV')
+
+
 if __name__ == '__main__':
     # noinspection PyTypeChecker
     parser = argparse.ArgumentParser(description=__doc__,
@@ -218,6 +253,9 @@ if __name__ == '__main__':
     group.add_argument('username', help='find all dead video links by this user', nargs='?')
     group.add_argument('-s', '--sort',
                        help=f'sort users in {PATH_OUT} by dead links count',
+                       action='store_true')
+    group.add_argument('-c', '--convert',
+                       help=f'convert {PATH_OUT} to .csv',
                        action='store_true')
     subgroup = parser.add_argument_group('search users by charts')
     subgroup.add_argument('-t', '--top',
@@ -244,6 +282,8 @@ if __name__ == '__main__':
             write_dead_in_profile(user=args.username)
         elif args.sort:
             sort_output_file()
+        elif args.convert:
+            convert_output_file_to_csv()
         elif args.top:
             minpage = args.minpage or 1
             users_ = list(top_users(from_=minpage, to=args.top, by_all_checks=args.allchecks))

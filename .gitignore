@@ -4,5 +4,6 @@ __pycache__/
 *.key
 *.txt
 *.log
+*.csv
 
 result*.md
