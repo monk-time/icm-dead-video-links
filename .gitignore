@@ -7,4 +7,6 @@ __pycache__/
 *.log
 *.csv
 
+!requirements.txt
+
 result*.md
