@@ -280,17 +280,20 @@ if __name__ == '__main__':
     try:
         if args.username:
             write_dead_in_profile(user=args.username)
-        elif args.sort:
-            sort_output_file()
-        elif args.convert:
-            convert_output_file_to_csv()
         elif args.top:
             minpage = args.minpage or 1
             users_ = list(top_users(from_=minpage, to=args.top, by_all_checks=args.allchecks))
             write_dead_by_users(users_, ignore_blacklist=args.ignore_blacklist)
+        elif args.sort:
+            sort_output_file()
+        elif args.convert:
+            convert_output_file_to_csv()
         else:
             print('No username given.')
             parser.print_usage()
     except KeyboardInterrupt:
         logging.info('Execution stopped by the user.')
         parser.exit()
+
+# TODO: turn comment links into beta links
+# TODO: login first

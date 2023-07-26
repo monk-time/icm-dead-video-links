@@ -45,8 +45,8 @@ def top_commenters_on_movies_in_a_list(url: str, min_comments: int = 0) -> List[
 
 
 if __name__ == '__main__':
-    url_ = 'https://www.icheckmovies.com/lists/all+shorts+on+icm+lists/mjf314/'
+    url_ = 'https://www.icheckmovies.com/lists/icheckmovies+most+favorite+shorts/mjf314/'
     top_commenters = top_commenters_on_movies_in_a_list(url_)
     print('Top commenters:\n', top_commenters)
-    users_to_check = list(user for user, cnt in top_commenters)
-    write_dead_by_users(users_to_check)
+    # users_to_check = list(user for user, cnt in top_commenters)
+    # write_dead_by_users(users_to_check)

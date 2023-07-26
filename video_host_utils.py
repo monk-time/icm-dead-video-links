@@ -21,8 +21,8 @@ def extract_video_ids(regex: Pattern, s: str):
     return [m.group(1) for m in regex.finditer(s)]
 
 
-PROXIES = {'http': 'proxy-nossl.antizapret.prostovpn.org:29976',
-           'https': 'proxy-nossl.antizapret.prostovpn.org:29976'}
+PROXIES = {'http': 'http://proxy-nossl.antizapret.prostovpn.org:29976',
+           'https': 'https://proxy-ssl.antizapret.prostovpn.org:3143'}
 
 
 def get_video_status(url: str, vid: str, use_proxy: bool = False) -> str:
