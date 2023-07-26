@@ -11,9 +11,11 @@ yt_key_path: Path = Path(__file__).resolve().parent / YT_KEY_FILENAME
 if yt_key_path.exists():
     YT_API_KEY = yt_key_path.read_text().strip()
 else:
-    raise FileNotFoundError(f'Create a file "{YT_KEY_FILENAME}" in the script directory\n'
-                            f'and put your Google API key inside.\n'
-                            'For more info: https://support.google.com/googleapi/answer/6158862')
+    raise FileNotFoundError(
+        f'Create a file "{YT_KEY_FILENAME}" in the script directory\n'
+        f'and put your Google API key inside.\n'
+        'For more info: https://support.google.com/googleapi/answer/6158862'
+    )
 
 
 def extract_video_ids(regex: Pattern, s: str):
@@ -21,13 +23,19 @@ def extract_video_ids(regex: Pattern, s: str):
     return [m.group(1) for m in regex.finditer(s)]
 
 
-PROXIES = {'http': 'http://proxy-nossl.antizapret.prostovpn.org:29976',
-           'https': 'https://proxy-ssl.antizapret.prostovpn.org:3143'}
+PROXIES = {
+    'http': 'http://proxy-nossl.antizapret.prostovpn.org:29976',
+    'https': 'https://proxy-ssl.antizapret.prostovpn.org:3143',
+}
 
 
 def get_video_status(url: str, vid: str, use_proxy: bool = False) -> str:
     """Check if a given video id is available by sending a HEAD request."""
-    r = requests.head(url.format(vid), allow_redirects=True, proxies=PROXIES if use_proxy else None)
+    r = requests.head(
+        url.format(vid),
+        allow_redirects=True,
+        proxies=PROXIES if use_proxy else None,
+    )
     return 'ok' if r.status_code == requests.codes.ok else 'not found'
 
 
@@ -35,8 +43,13 @@ def get_yt_video_status(ytid: str) -> str:
     """Check if a youtube video is available via Youtube Data API v3."""
     r = requests.get(
         'https://www.googleapis.com/youtube/v3/videos',
-        {'id': ytid, 'key': YT_API_KEY, 'part': 'status,contentDetails',
-         'fields': 'items(status,contentDetails/regionRestriction)'})
+        {
+            'id': ytid,
+            'key': YT_API_KEY,
+            'part': 'status,contentDetails',
+            'fields': 'items(status,contentDetails/regionRestriction)',
+        },
+    )
     r.raise_for_status()
     yt_response = r.json()
     if not yt_response['items']:
@@ -46,7 +59,8 @@ def get_yt_video_status(ytid: str) -> str:
     if status['privacyStatus'] == 'private':
         return 'private'  # also can be: public, unlisted
     if status['uploadStatus'] != 'processed':
-        # also can be: deleted, failed (to upload), rejected (by YT), uploaded (and private?)
+        # also can be: deleted, failed (to upload),
+        # rejected (by YT), uploaded (and private?)
         return 'removed'
 
     if 'contentDetails' not in video_info:
@@ -62,29 +76,39 @@ def get_yt_video_status(ytid: str) -> str:
         n_allowed = len(region['allowed'])
         if n_allowed == 0:
             return 'blocked everywhere'
-        else:
-            return 'ok'
+        return 'ok'
 
     if 'blocked' in region:
         n_blocked = len(region['blocked'])
-        if n_blocked == 249:  # all officially assigned ISO 3166-1 alpha-2 codes
+        # 249 = all officially assigned ISO 3166-1 alpha-2 codes
+        if n_blocked == 249:
             return 'blocked everywhere'
-        else:
-            return 'ok'
+        return 'ok'
 
-    raise RuntimeError(f'Unexpected Youtube API response for {ytid}', yt_response)
+    raise RuntimeError(
+        f'Unexpected Youtube API response for {ytid}', yt_response
+    )
 
 
 class VideoHostToolset:
-    def __init__(self, regex: Pattern, url: str, use_proxy: bool = False,
-                 get_status: Callable[[str], str] = None):
+    def __init__(
+        self,
+        regex: Pattern,
+        url: str,
+        use_proxy: bool = False,
+        get_status: Callable[[str], str] = None,
+    ):
         self.url = url
         self.extract = partial(extract_video_ids, regex)
-        self.get_status = partial(get_video_status, url, use_proxy=use_proxy) \
-            if get_status is None else get_status
+        self.get_status = (
+            partial(get_video_status, url, use_proxy=use_proxy)
+            if get_status is None
+            else get_status
+        )
 
 
-RE_YT_ID = re.compile(r"""
+RE_YT_ID = re.compile(
+    r"""
     (?:youtu\.be/|
        youtube\.com/
        (?:(?:vi?|(?:user/)?\w+#p/(?:\w+/)?\w+/\d+|
@@ -92,30 +116,41 @@ RE_YT_ID = re.compile(r"""
           (?:[\w?=]+)?[?&]vi?=)
     )
     ([-_a-zA-Z0-9]{11,12})
-    """, re.VERBOSE)
+    """,
+    re.VERBOSE,
+)
 
 VIDEO_HOSTS = {
     'youtube': VideoHostToolset(
         regex=RE_YT_ID,
         url='https://www.youtube.com/watch?v={}',
-        get_status=get_yt_video_status),
+        get_status=get_yt_video_status,
+    ),
     'vimeo': VideoHostToolset(
-        regex=re.compile(r'vimeo\.com/(\d+)'),
-        url='https://vimeo.com/{}'),
+        regex=re.compile(r'vimeo\.com/(\d+)'), url='https://vimeo.com/{}'
+    ),
     'dailymotion': VideoHostToolset(
         regex=(re.compile(r'dailymotion\.com/video/([^"\s]+)')),
         url='https://www.dailymotion.com/video/{}',
-        use_proxy=True),
+        use_proxy=True,
+    ),
     'googlevideo': VideoHostToolset(
         regex=re.compile(r'video\.google\.com/videoplay\?.*?docid=([-0-9]+)'),
-        url='http://video.google.com/videoplay?docid={}')
+        url='http://video.google.com/videoplay?docid={}',
+    ),
 }
 
 if __name__ == '__main__':
     print(VIDEO_HOSTS['youtube'].get_status('dQw4w9WgXcQ'))  # ok
-    print(VIDEO_HOSTS['youtube'].get_status('N9lpD_lWIUo'))  # unavailable (account deleted)
-    print(VIDEO_HOSTS['youtube'].get_status('OkuxYgBNv9c'))  # unavailable (copyright claim)
-    print(VIDEO_HOSTS['youtube'].get_status('PZMywkeqpx4'))  # unavailable (private)
+    print(
+        VIDEO_HOSTS['youtube'].get_status('N9lpD_lWIUo')
+    )  # unavailable (account deleted)
+    print(
+        VIDEO_HOSTS['youtube'].get_status('OkuxYgBNv9c')
+    )  # unavailable (copyright claim)
+    print(
+        VIDEO_HOSTS['youtube'].get_status('PZMywkeqpx4')
+    )  # unavailable (private)
     print(VIDEO_HOSTS['youtube'].get_status('sVm7Cqm9Z5c'))  # unavailable
     print(VIDEO_HOSTS['youtube'].get_status('SVEfr7Tfm-g'))  # unavailable
     print(VIDEO_HOSTS['dailymotion'].get_status('x2bm1t9'))  # ok
