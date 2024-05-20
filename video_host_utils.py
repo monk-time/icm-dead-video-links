@@ -1,7 +1,7 @@
 import re
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Callable, Pattern
 
 import requests
 
@@ -11,14 +11,15 @@ yt_key_path: Path = Path(__file__).resolve().parent / YT_KEY_FILENAME
 if yt_key_path.exists():
     YT_API_KEY = yt_key_path.read_text().strip()
 else:
-    raise FileNotFoundError(
+    msg = (
         f'Create a file "{YT_KEY_FILENAME}" in the script directory\n'
         f'and put your Google API key inside.\n'
         'For more info: https://support.google.com/googleapi/answer/6158862'
     )
+    raise FileNotFoundError(msg)
 
 
-def extract_video_ids(regex: Pattern, s: str):
+def extract_video_ids(regex: re.Pattern, s: str):
     """Find all video ids from video urls in a text string using regex."""
     return [m.group(1) for m in regex.finditer(s)]
 
@@ -29,7 +30,7 @@ PROXIES = {
 }
 
 
-def get_video_status(url: str, vid: str, use_proxy: bool = False) -> str:
+def get_video_status(url: str, vid: str, *, use_proxy: bool = False) -> str:
     """Check if a given video id is available by sending a HEAD request."""
     r = requests.head(
         url.format(vid),
@@ -39,7 +40,7 @@ def get_video_status(url: str, vid: str, use_proxy: bool = False) -> str:
     return 'ok' if r.status_code == requests.codes.ok else 'not found'
 
 
-def get_yt_video_status(ytid: str) -> str:
+def get_yt_video_status(ytid: str) -> str:  # noqa: PLR0911
     """Check if a youtube video is available via Youtube Data API v3."""
     r = requests.get(
         'https://www.googleapis.com/youtube/v3/videos',
@@ -85,18 +86,18 @@ def get_yt_video_status(ytid: str) -> str:
             return 'blocked everywhere'
         return 'ok'
 
-    raise RuntimeError(
-        f'Unexpected Youtube API response for {ytid}', yt_response
-    )
+    msg = f'Unexpected Youtube API response for {ytid}'
+    raise RuntimeError(msg, yt_response)
 
 
 class VideoHostToolset:
     def __init__(
         self,
-        regex: Pattern,
+        *,
+        regex: re.Pattern,
         url: str,
         use_proxy: bool = False,
-        get_status: Callable[[str], str] = None,
+        get_status: Callable[[str], str] | None = None,
     ):
         self.url = url
         self.extract = partial(extract_video_ids, regex)

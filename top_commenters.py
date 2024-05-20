@@ -1,10 +1,8 @@
 from collections import Counter
-from typing import Iterable, List, Tuple
+from collections.abc import Iterable
 
 import requests
 from bs4 import BeautifulSoup
-
-from find_dead import write_dead_by_users
 
 
 def number_of_pages(movie: str) -> int:
@@ -12,8 +10,8 @@ def number_of_pages(movie: str) -> int:
     r = requests.get(f'https://www.icheckmovies.com/movies/{movie}/comments/')
     if r.status_code != requests.codes.ok:
         print(
-            f"Error while fetching the first page of comments on {movie}: "
-            f"HTTP error {r.status_code}"
+            f'Error while fetching the first page of comments on {movie}: '
+            f'HTTP error {r.status_code}'
         )
         return 0
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -46,7 +44,7 @@ def commenters(movie: str) -> Counter:
 
 def top_commenters_on_movies_in_a_list(
     url: str, min_comments: int = 0
-) -> List[Tuple[str, int]]:
+) -> list[tuple[str, int]]:
     counters = (commenters(m) for m in all_movies_on_a_list(url))
     summary = sum(counters, Counter())
     return [
@@ -58,5 +56,3 @@ if __name__ == '__main__':
     url_ = 'https://www.icheckmovies.com/lists/icheckmovies+most+favorite+shorts/mjf314/'
     top_commenters = top_commenters_on_movies_in_a_list(url_)
     print('Top commenters:\n', top_commenters)
-    # users_to_check = list(user for user, cnt in top_commenters)
-    # write_dead_by_users(users_to_check)

@@ -17,9 +17,9 @@ import logging
 import re
 import sys
 import urllib.parse
+from collections.abc import Collection, Generator, Iterable
 from copy import copy
 from pathlib import Path
-from typing import Generator, Iterable, List, Sequence
 
 import requests
 from bs4 import BeautifulSoup
@@ -35,7 +35,7 @@ URL_USERS_BY_CHECKS = 'https://www.icheckmovies.com/profiles/?sort=checks'
 try:
     script_path = Path(__file__).resolve().parent
 except NameError:
-    script_path = Path('.')
+    script_path = Path()
 
 
 # ----- Logging setup -----
@@ -67,7 +67,7 @@ for lib in ['requests', 'urllib3']:
 try:
     from video_host_utils import VIDEO_HOSTS
 except FileNotFoundError as e:
-    logging.error('Google API key is missing.')
+    logging.exception('Google API key is missing.')
     print(*e.args)
     sys.exit(1)
 
@@ -78,7 +78,7 @@ def number_of_pages(user: str) -> int:
     if r.status_code != requests.codes.ok:
         logging.error(
             f"Error while fetching the first page of {user}'s comments: "
-            f"HTTP error {r.status_code}"
+            f'HTTP error {r.status_code}'
         )
         return 0
     if '/login/' in r.url:
@@ -100,10 +100,10 @@ def parse_comment(comment: Tag):
         movie = movie['href']
     text = comment.select_one('.span-18 > span')
     text = text.get_text() if text else ''
-    # TODO: fix the line above for comments with no text, e.g.:
+    # TODO(monk-time): fix the line above for comments with no text, e.g.:
     # "<span><iframe allowfullscreen="" frameborder="0" height="310"
-    # src="http://www.youtube.com/embed/0qFS5IEctis?wmode=opaque"
-    # title="YouTube video player" width="508"></iframe></span>"
+    # width="508" src="http://www.youtube.com/embed/0qFS5IEctis?wmode=opaque"
+    # title="YouTube video player"></iframe></span>"
     for host in VIDEO_HOSTS:
         ids = VIDEO_HOSTS[host].extract(text)
         if ids:
@@ -111,7 +111,7 @@ def parse_comment(comment: Tag):
                 yield movie, host, vid
 
 
-def comments_in_profile_page(*, user: str, page: int) -> List[Tag]:
+def comments_in_profile_page(*, user: str, page: int) -> list[Tag]:
     """Get comments of an ICM user from one page of their profile."""
     r = requests.get(URL_USER_COMMENTS, {'user': user, 'page': page})
     logging.info(f"Checking {user}'s page #{page}")
@@ -129,8 +129,9 @@ def comments_in_profile_page(*, user: str, page: int) -> List[Tag]:
 def comments_in_profile(
     *, user: str, from_: int = 1, to: int
 ) -> Generator[Tag, None, None]:
-    """Get all comments of an ICM user,
-    optionally limited to a subrange (inclusive) of their pages.
+    """Get all comments of an ICM user.
+
+    Comments may be limited to a subrange (inclusive) of their pages.
     """
     for page in range(from_, to + 1):
         yield from comments_in_profile_page(user=user, page=page)
@@ -138,6 +139,7 @@ def comments_in_profile(
 
 def dead_in_comments(comments: Iterable[Tag]):
     """Find all dead video links in the given comment elements.
+
     Supports comments that have several links.
     """
     comments_with_video = itertools.chain.from_iterable(
@@ -156,7 +158,8 @@ def dead_in_comments(comments: Iterable[Tag]):
 
 def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     """Output all dead video links made by an ICM user to a .md file.
-    Fetches all comment pages unless a subrange (inclusive) is provided.
+
+    Fetch all comment pages unless a subrange (inclusive) is provided.
     """
     logging.info(f'\nChecking {user}...')
     to = to or number_of_pages(user)
@@ -166,7 +169,7 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
     dead_links = list(dead_in_comments(comments))
     if not dead_links:
         return
-    with open(script_path / PATH_OUT, mode='a', encoding='utf-8') as f:
+    with (script_path / PATH_OUT).open(mode='a', encoding='utf-8') as f:
         f.write(
             f'## [{user}]({URL_USER_COMMENTS}'
             f'?user={urllib.parse.quote_plus(user)}) '
@@ -184,9 +187,7 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
 def top_users(
     *, from_: int = 1, to: int = 1, by_all_checks: bool = False
 ) -> Generator[str, None, None]:
-    """Get all top-ranking users from the first N pages of profile charts
-    or charts by all checks.
-    """
+    """Get all top-ranking users from profile charts or by all checks."""
     logging.info(
         f'Fetching {to - from_ + 1} pages of users from ICM '
         f'(starting from #{from_})...'
@@ -202,16 +203,18 @@ def top_users(
 
 def filter_by_blacklist(users: Iterable[str]):
     """Exclude users listed in a blacklist file."""
-    with open(script_path / PATH_CHECKED_USERS, encoding='utf-8') as f:
+    with (script_path / PATH_CHECKED_USERS).open(encoding='utf-8') as f:
         checked_users = [s.strip() for s in f if s.strip()]
     yield from (u for u in users if u not in checked_users)
 
 
-def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
+def write_dead_by_users(
+    users: Collection[str], *, ignore_blacklist: bool = False
+):
     """Output all dead video links made by the given ICM users to a .md file.
+
     Can use a blacklist file to avoid re-checking users.
     """
-    # TODO: change type hint from Sequence to Collection (PyCharm bug PY-24605)
     logging.info(f'Got {len(users)} unchecked users')
     if not ignore_blacklist:
         users = list(filter_by_blacklist(users))
@@ -219,8 +222,7 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
             f'Got {len(users)} unchecked users after applying blacklist '
             f'({PATH_CHECKED_USERS})'
         )
-    with open(
-        script_path / PATH_CHECKED_USERS,
+    with (script_path / PATH_CHECKED_USERS).open(
         mode='a',
         buffering=1,
         encoding='utf-8',
@@ -232,16 +234,14 @@ def write_dead_by_users(users: Sequence[str], ignore_blacklist: bool = False):
 
 
 def sort_output_file(filename=PATH_OUT):
-    """Modify the output file so that users are sorted
-    by the number of their dead links descending.
-    """
-    with open(script_path / filename, encoding='utf-8') as f:
+    """Sort users in the output file by the number of their dead links desc."""
+    with (script_path / filename).open(encoding='utf-8') as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
     blocks_with_lens = [
         (b, int(re.search(r' \((\d+)\)\n', b).group(1))) for b in blocks
     ]
     blocks_with_lens.sort(key=lambda t: (-t[1], t[0]))
-    with open(script_path / filename, mode='w', encoding='utf-8') as f:
+    with (script_path / filename).open(mode='w', encoding='utf-8') as f:
         f.writelines(b[0] for b in blocks_with_lens)
 
     num_dead = sum(n for _, n in blocks_with_lens)
@@ -250,7 +250,7 @@ def sort_output_file(filename=PATH_OUT):
 
 def convert_output_file_to_csv(filename=PATH_OUT):
     """Convert the output file to a .CSV format."""
-    with open(script_path / filename, encoding='utf-8') as f:
+    with (script_path / filename).open(encoding='utf-8') as f:
         blocks = ['##' + s for s in f.read().split('##') if s]
 
     re_header = re.compile(
@@ -277,7 +277,7 @@ def convert_output_file_to_csv(filename=PATH_OUT):
         full_rows.extend({**author, **row} for row in rows)
 
     csv_path = script_path / Path(filename).with_suffix('.csv')
-    with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+    with csv_path.open(mode='w', newline='', encoding='utf-8') as f:
         fieldnames = ['author', 'comment_url', 'host', 'video_url', 'blocked']
         writer = csv.DictWriter(f, fieldnames, extrasaction='ignore')
         writer.writeheader()
@@ -365,5 +365,5 @@ if __name__ == '__main__':
         logging.info('Execution stopped by the user.')
         parser.exit()
 
-# TODO: turn comment links into beta links
-# TODO: login first
+# TODO(monk-time): turn comment links into beta links
+# TODO(monk-time): login first
