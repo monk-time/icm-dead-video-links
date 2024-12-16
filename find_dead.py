@@ -67,7 +67,7 @@ for lib in ['requests', 'urllib3']:
 try:
     from video_host_utils import VIDEO_HOSTS
 except FileNotFoundError as e:
-    logging.exception('Google API key is missing.')
+    logger.exception('Google API key is missing.')
     print(*e.args)
     sys.exit(1)
 
@@ -76,13 +76,13 @@ def number_of_pages(user: str) -> int:
     """Get the total number of comment pages of an ICM user."""
     r = requests.get(URL_USER_COMMENTS, {'user': user})
     if r.status_code != requests.codes.ok:
-        logging.error(
+        logger.error(
             f"Error while fetching the first page of {user}'s comments: "
             f'HTTP error {r.status_code}'
         )
         return 0
     if '/login/' in r.url:
-        logging.error(f"User {user} doesn't exist.")
+        logger.error(f"User {user} doesn't exist.")
         return 0
     soup = BeautifulSoup(r.text, 'html.parser')
     paginator = soup.select('.pages li a')
@@ -114,9 +114,9 @@ def parse_comment(comment: Tag):
 def comments_in_profile_page(*, user: str, page: int) -> list[Tag]:
     """Get comments of an ICM user from one page of their profile."""
     r = requests.get(URL_USER_COMMENTS, {'user': user, 'page': page})
-    logging.info(f"Checking {user}'s page #{page}")
+    logger.info(f"Checking {user}'s page #{page}")
     if r.status_code != requests.codes.ok:
-        logging.error(f'Page #{page}: HTTP error {r.status_code}')
+        logger.error(f'Page #{page}: HTTP error {r.status_code}')
         return []
     soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -148,9 +148,9 @@ def dead_in_comments(comments: Iterable[Tag]):
     for movie, host, vid in comments_with_video:
         status = VIDEO_HOSTS[host].get_status(vid)
         if status == 'ok':
-            logging.debug(f'[{host}] {vid} on {movie}: OK')
+            logger.debug(f'[{host}] {vid} on {movie}: OK')
             continue
-        logging.warning(f'[{host}] {vid} on {movie}: {status}')
+        logger.warning(f'[{host}] {vid} on {movie}: {status}')
         if status == 'not found':
             status = None
         yield movie, host, vid, status
@@ -161,10 +161,10 @@ def write_dead_in_profile(*, user: str, from_: int = 1, to: int = 0):
 
     Fetch all comment pages unless a subrange (inclusive) is provided.
     """
-    logging.info(f'\nChecking {user}...')
+    logger.info(f'\nChecking {user}...')
     to = to or number_of_pages(user)
     if to > 0:
-        logging.info(f'Got {to} pages of comments')
+        logger.info(f'Got {to} pages of comments')
     comments = comments_in_profile(user=user, from_=from_, to=to)
     dead_links = list(dead_in_comments(comments))
     if not dead_links:
@@ -188,7 +188,7 @@ def top_users(
     *, from_: int = 1, to: int = 1, by_all_checks: bool = False
 ) -> Generator[str, None, None]:
     """Get all top-ranking users from profile charts or by all checks."""
-    logging.info(
+    logger.info(
         f'Fetching {to - from_ + 1} pages of users from ICM '
         f'(starting from #{from_})...'
     )
@@ -215,10 +215,10 @@ def write_dead_by_users(
 
     Can use a blacklist file to avoid re-checking users.
     """
-    logging.info(f'Got {len(users)} unchecked users')
+    logger.info(f'Got {len(users)} unchecked users')
     if not ignore_blacklist:
         users = list(filter_by_blacklist(users))
-        logging.info(
+        logger.info(
             f'Got {len(users)} unchecked users after applying blacklist '
             f'({PATH_CHECKED_USERS})'
         )
@@ -245,7 +245,7 @@ def sort_output_file(filename=PATH_OUT):
         f.writelines(b[0] for b in blocks_with_lens)
 
     num_dead = sum(n for _, n in blocks_with_lens)
-    logging.info(f'{num_dead} dead links in {PATH_OUT}')
+    logger.info(f'{num_dead} dead links in {PATH_OUT}')
 
 
 def convert_output_file_to_csv(filename=PATH_OUT):
@@ -284,7 +284,7 @@ def convert_output_file_to_csv(filename=PATH_OUT):
         for row in full_rows:
             writer.writerow(row)
 
-    logging.info(
+    logger.info(
         f'Exported {len(full_rows)} dead links from {PATH_OUT} as .CSV'
     )
 
@@ -362,8 +362,9 @@ if __name__ == '__main__':
             print('No username given.')
             parser.print_usage()
     except KeyboardInterrupt:
-        logging.info('Execution stopped by the user.')
+        logger.info('Execution stopped by the user.')
         parser.exit()
 
 # TODO(monk-time): turn comment links into beta links
 # TODO(monk-time): login first
+# TODO(monk-time): workaround cloudflare protection

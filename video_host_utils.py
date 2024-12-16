@@ -41,7 +41,11 @@ def get_video_status(url: str, vid: str, *, use_proxy: bool = False) -> str:
 
 
 def get_yt_video_status(ytid: str) -> str:  # noqa: PLR0911
-    """Check if a youtube video is available via Youtube Data API v3."""
+    """Check if a youtube video is available via Youtube Data API v3.
+
+    Raises:
+        RuntimeError: if received an unexpected Youtube API response.
+    """
     r = requests.get(
         'https://www.googleapis.com/youtube/v3/videos',
         {

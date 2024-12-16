@@ -1,0 +1,10 @@
+[project]
+name = "icm-dead-video-links"
+version = "0.1.0"
+description = "A tool to find dead video links in comments on icheckmovies.com"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "requests>=2.32.3",
+]
